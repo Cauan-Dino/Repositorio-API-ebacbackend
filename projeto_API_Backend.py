@@ -3,13 +3,21 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-app = FastAPI()
+app = FastAPI(
+    title= "API De livros",
+    description= "API de catálogos de livros do curso da ebac Back-end",
+    version="1.0.0",
+    contact={
+        "email":"cauanppenha@gmail.com",
+        "name": "cauan dino penha"
+        }
+)
 
 meus_livros = {}
 
 class Livro(BaseModel):
     nome_livro: str
-    ano_lancamento: int
+    ano_lancamento: int 
     nome_autor: str
 
 # 1. Criar um get para ver os livros que estao cadastrados
@@ -32,11 +40,10 @@ def post_meus_livros(id_livro:int,livro: Livro):
 # 3. Criar um put para atualizar um livro ja existente
 @app.put('/atualizar_livro/{id_livro}')
 def put_meus_livros(id_livro:int,livro: Livro):
-    meu_livro = meus_livros.get(id_livro)
     if id_livro not in meus_livros or not meus_livros:
         raise HTTPException(status_code=404,detail='Esse livro nao existe')
     else:
-        meu_livro[id_livro] = livro.model_dump()
+        meus_livros[id_livro] = livro.model_dump()
         return {'message':f'Livro atualizado com sucesso'}
 
 # 4. Criar um delete
