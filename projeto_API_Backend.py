@@ -34,7 +34,7 @@ def post_meus_livros(id_livro:int,livro: Livro):
     if id_livro in meus_livros:
         raise HTTPException(status_code=400,detail='Esse livro ja esta cadastrado')
     else:
-        meus_livros[id_livro] = livro.model_dump()
+        meus_livros[id_livro] = livro
         return {'message':f'Livro {livro.nome_livro} cadastrado com sucesso'}
 
 # 3. Criar um put para atualizar um livro ja existente
@@ -43,7 +43,7 @@ def put_meus_livros(id_livro:int,livro: Livro):
     if id_livro not in meus_livros or not meus_livros:
         raise HTTPException(status_code=404,detail='Esse livro nao existe')
     else:
-        meus_livros[id_livro] = livro.model_dump()
+        meus_livros[id_livro] = livro
         return {'message':f'Livro atualizado com sucesso'}
 
 # 4. Criar um delete
@@ -54,4 +54,3 @@ def delete_meus_livros(id_livro:int):
     else:
         del(meus_livros[id_livro])
         return{'message':'Livro deletado com sucesso'}
-
