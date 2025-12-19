@@ -40,7 +40,7 @@ def post_meus_livros(id_livro:int,livro: Livro):
 # 3. Criar um put para atualizar um livro ja existente
 @app.put('/atualizar_livro/{id_livro}')
 def put_meus_livros(id_livro:int,livro: Livro):
-    if id_livro not in meus_livros or not meus_livros:
+    if id_livro not in meus_livros:
         raise HTTPException(status_code=404,detail='Esse livro nao existe')
     else:
         meus_livros[id_livro] = livro
@@ -54,3 +54,4 @@ def delete_meus_livros(id_livro:int):
     else:
         del(meus_livros[id_livro])
         return{'message':'Livro deletado com sucesso'}
+
