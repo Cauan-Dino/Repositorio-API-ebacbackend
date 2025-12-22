@@ -6,12 +6,12 @@ import secrets
 
 
 app = FastAPI(
-    title= "API De livros",
-    description= "API de catálogos de livros do curso da ebac Back-end",
-    version="1.0.0",
+    title= 'API De livros',
+    description= 'API de catálogos de livros do curso da ebac Back-end',
+    version='1.0.0',
     contact={
-        "email":"cauanppenha@gmail.com",
-        "name": "cauan dino penha"
+        'email':'cauanppenha@gmail.com',
+        'name': 'cauan dino penha'
         }
 )
 
@@ -44,12 +44,27 @@ def autenticar_meu_usuario(crenditials: HTTPBasicCredentials = Depends(security)
 
 # 1. Criar um get para ver os livros que estao cadastrados
 @app.get('/livros')
-def get_meus_livros(credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
+def get_meus_livros(page: int = 1,limit: int = 10,credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
+    if page < 1 or limit < 1:
+        raise HTTPException(status_code=400,detail='Page ou limit invalidos')
+    
     if not meus_livros:
-        return {'message':'Ainda nao ha nada cadastrado'}
-    else:
-        return {'livros':meus_livros}
+        return {'message':'Ainda nao ha nada castrado'}
+    
+    start = (page-1) * limit
+    end = start + limit
 
+    paginacao = [
+        {'id':id_livro,'nome_autor':objeto.nome_autor,'nome_livro':objeto.nome_livro,'ano_lancamento':objeto.ano_lancamento}
+        for id_livro, objeto in list(meus_livros.items())[start:end]
+    ]
+
+    return {
+        'pagina': page,
+        'limite': limit,
+        'total': len(meus_livros),
+        'livros': paginacao
+            }
 
 # 2. Criar um post para adicionar um livro
 @app.post('/adicionar_livro')
