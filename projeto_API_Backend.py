@@ -22,6 +22,13 @@ class Livro(BaseModel):
     ano_lancamento: int 
     nome_autor: str
 
+
+meus_processos = {}
+
+class Processo(BaseModel):
+    nome: str
+    idade: int
+
 # Senha e Usuario para fazer login
 MINHA_SENHA = 'admin'
 MEU_USUARIO = 'admin'
@@ -54,9 +61,11 @@ def get_meus_livros(page: int = 1,limit: int = 10,credentials: HTTPBasicCredenti
     start = (page-1) * limit
     end = start + limit
 
+    livros_ordenados = sorted(meus_livros.items(),key=lambda x: x[0])
+
     paginacao = [
         {'id':id_livro,'nome_autor':objeto.nome_autor,'nome_livro':objeto.nome_livro,'ano_lancamento':objeto.ano_lancamento}
-        for id_livro, objeto in list(meus_livros.items())[start:end]
+        for id_livro, objeto in livros_ordenados[start:end]
     ]
 
     return {
@@ -76,6 +85,18 @@ def post_meus_livros(id_livro:int,livro: Livro,credentials: HTTPBasicCredentials
         return {'message':f'Livro {livro.nome_livro} cadastrado com sucesso'}
 
 
+# Endpoint para adicionar um processo (recebe `nome` e `idade` no body)
+@app.post('/processos')
+def post_meus_processos(processo: Processo, credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
+    """
+    Exemplo cURL:
+    curl -X POST "http://localhost:8000/processos" -u admin:admin -H "Content-Type: application/json" -d "{\"nome\": \"Joao\", \"idade\": 30}"
+    """
+    new_id = max(meus_processos.keys(), default=0) + 1
+    meus_processos[new_id] = processo
+    return {'id': new_id, 'message': f'Processo {processo.nome} cadastrado com sucesso'}
+
+
 # 3. Criar um put para atualizar um livro ja existente
 @app.put('/atualizar_livro/{id_livro}')
 def put_meus_livros(id_livro:int,livro: Livro,credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
@@ -88,7 +109,7 @@ def put_meus_livros(id_livro:int,livro: Livro,credentials: HTTPBasicCredentials 
 
 # 4. Criar um delete
 @app.delete('/deletar_livro/{id_livro}')
-def delete_meus_livros(id_livro:int):
+def delete_meus_livros(id_livro:int, credentials: HTTPBasicCredentials = Depends(autenticar_meu_usuario)):
     if id_livro not in meus_livros:
         raise HTTPException(status_code=404,detail='Nao foi possivel encontrar esse livro')
     else:
