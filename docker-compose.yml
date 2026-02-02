@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: livros-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    env_file:
+      - variaveis_ambientes.env
+    command: ["poetry", "run", "uvicorn", "projeto_API_Backend:app", "--host", "0.0.0.0", "--port", "8000"]
+
+

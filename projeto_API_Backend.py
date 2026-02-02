@@ -1,11 +1,14 @@
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="variaveis_ambientes.env")
 from fastapi import FastAPI,HTTPException,Depends
 from fastapi.security import HTTPBasicCredentials,HTTPBasic
 from pydantic import BaseModel
 from typing import Optional
 import secrets
-
+import os
 from sqlalchemy import create_engine,Column ,Integer,String
 from sqlalchemy.orm import Session,sessionmaker,declarative_base
+from fastapi.middleware.cors import CORSMiddleware
 
 # 1. Criacao de objetos/ Variaveis
 
@@ -20,18 +23,26 @@ app = FastAPI(
         }
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # deixa qualquer front acessar
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # 1.2 Criacao do objeto da classe HTTPBasic que nos permite colocar senhas e usuarios e utilizar a autenticacao do  HTTP Basic
 security = HTTPBasic()
 
 # 1.3 Criacao da variavel para criar um banco de dados
 
-DATABASE_URL = 'sqlite:///./livros.db'
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL,connect_args={'check_same_thread': False})
 Sessionlocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
 Base = declarative_base()
 
-# 2. Criacao de body model 
+# 2. Criacao de body model e das colunas do banco de dados
 
 class LivroDB(Base):
     __tablename__ = 'Livros'
@@ -45,8 +56,14 @@ class Livro(BaseModel):
     nome_autor: str
     ano_lancamento: int
 
+# teuto evitar  
+# litio
+# LIBERACAO IMDIADA quetros
+# fazer o exame de sangue para medir a dose  do carbolitio no sangue 12 horas de intervalo apos tomar o remedio para fazer o exame. fazer o exame apos uma semana
+# Ver em marco dr leandro trovao terca 24 marco as 11 da manha 
+
 def sessao_db():
-    db = Sessionlocal()
+    db = Sessionlocal() 
     try:
         yield db
     finally:
@@ -59,8 +76,8 @@ Base.metadata.create_all(bind=engine)
 
 # 3.1 Funcao para permitir que o usuario consiga colocar a senha e o usuario
 def autenticar_meu_usuario(crenditials: HTTPBasicCredentials = Depends(security)):
-    MINHA_SENHA = 'admin'
-    MEU_USUARIO = 'admin'
+    MEU_USUARIO = os.getenv("MEU_USUARIO")
+    MINHA_SENHA = os.getenv("MINHA_SENHA")
     
     is_username_correct = secrets.compare_digest(crenditials.username,MEU_USUARIO)
     is_password_correct = secrets.compare_digest(crenditials.password,MINHA_SENHA)
@@ -83,7 +100,7 @@ def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: 
         raise HTTPException(status_code=400,detail='Page ou limit invalidos')
     
     livros = db.query(LivroDB).offset((page-1)*limit).limit(limit).all()
-
+    
     if not livros:
         return {'message':'Ainda nao ha nada castrado'}
     
@@ -98,6 +115,10 @@ def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: 
             for livro in livros
                     ]
             }
+
+@app.get('/')
+def hello_world():
+    return {'hello':'world'}
 
 # 5. Metodo POST
 
@@ -115,7 +136,6 @@ def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(
     db.add(novo_livro)
     db.commit()
     db.refresh(novo_livro)
-    
 
     return {'message':'O livro foi adicionado com sucesso'}
 
@@ -136,7 +156,7 @@ def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),_: Non
     db_livro.nome_livro = livro.nome_livro
     db_livro.ano_lancamento = livro.ano_lancamento
     db_livro.nome_autor = livro.nome_autor
-    
+
     db.commit()
     db.refresh(db_livro)
 
