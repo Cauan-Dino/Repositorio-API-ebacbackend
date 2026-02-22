@@ -9,6 +9,7 @@ import os
 from sqlalchemy import create_engine,Column ,Integer,String
 from sqlalchemy.orm import Session,sessionmaker,declarative_base
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 
 # 1. Criacao de objetos/ Variaveis
 
@@ -55,13 +56,7 @@ class Livro(BaseModel):
     nome_livro: str
     nome_autor: str
     ano_lancamento: int
-
-# teuto evitar  
-# litio
-# LIBERACAO IMDIADA quetros
-# fazer o exame de sangue para medir a dose  do carbolitio no sangue 12 horas de intervalo apos tomar o remedio para fazer o exame. fazer o exame apos uma semana
-# Ver em marco dr leandro trovao terca 24 marco as 11 da manha 
-
+    
 def sessao_db():
     db = Sessionlocal() 
     try:
@@ -95,7 +90,7 @@ def autenticar_meu_usuario(crenditials: HTTPBasicCredentials = Depends(security)
 
 # 4.1 Criar um get para ver os livros que estao cadastrados
 @app.get('/livros')
-def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: None = Depends(autenticar_meu_usuario)):
+async def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: None = Depends(autenticar_meu_usuario)):
     if page < 1 or limit < 1:
         raise HTTPException(status_code=400,detail='Page ou limit invalidos')
     
@@ -120,11 +115,35 @@ def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: 
 def hello_world():
     return {'hello':'world'}
 
+async def resultado_1():
+    await asyncio.sleep(2)
+    return 'Resultado 1 foi executado'
+
+async def resultado_2():
+    await asyncio.sleep(2)
+    return 'Resultado 2 foi executado'
+
+async def resultado_3():
+    await asyncio.sleep(2)
+    return 'Resultado 3 foi executado'
+
+@app.get('/mostra-resultados')
+async def mostrar_resultados():
+    resultado1 = asyncio.create_task(resultado_1())
+    resultado2 = asyncio.create_task(resultado_2())
+    resultado3 = asyncio.create_task(resultado_3())
+
+    r1 = await resultado1
+    r2 = await resultado2
+    r3 = await resultado3
+
+    return [r1,r2,r3]
+
 # 5. Metodo POST
 
 # 5.1 Criar um post para adicionar um livro
 @app.post('/livros')
-def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(autenticar_meu_usuario)):
+async def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(autenticar_meu_usuario)):
     db_livro = db.query(LivroDB).filter(LivroDB.nome_livro == livro.nome_livro,LivroDB.nome_autor == livro.nome_autor).first()
     if db_livro:
         raise HTTPException(
@@ -145,7 +164,7 @@ def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(
 
 # 6.1 Criar um put para atualizar um livro ja existente
 @app.put('/livros/{id_livro}')
-def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(autenticar_meu_usuario)):
+async def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(autenticar_meu_usuario)):
     db_livro = db.query(LivroDB).filter(LivroDB.id == id_livro).first()
     if not db_livro:
         raise HTTPException(
@@ -166,7 +185,7 @@ def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),_: Non
 
 # 7.1 Criar um delete
 @app.delete('/livros/{id_livro}')
-def delete_livros(id_livro:int, _: None = Depends(autenticar_meu_usuario),db: Session = Depends(sessao_db)):
+async def delete_livros(id_livro:int, _: None = Depends(autenticar_meu_usuario),db: Session = Depends(sessao_db)):
     db_livro = db.query(LivroDB).filter(LivroDB.id == id_livro).first()
 
     if not db_livro:

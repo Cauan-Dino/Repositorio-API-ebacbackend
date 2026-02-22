@@ -1,16 +1,23 @@
 version: "3.8"
 
 services:
-  app:
-    build: .
+  app: # NOME DO SERVICO
+    build: . # SERVE PARA CONSTRUIR A IMAGEM UTILIZANDO O ARQUIVO DOCKERFILE NA MESMA PASTA QUE ESTA O ARQUIVO DOCKER-COMPOSE.yml
     container_name: livros-api
     ports:
       - "8000:8000"
     volumes:
       - .:/app
+      - db_data:/data
     working_dir: /app
-    env_file:
+    env_file: # PEGA O ARQUIVO .env
       - variaveis_ambientes.env
-    command: ["poetry", "run", "uvicorn", "projeto_API_Backend:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["poetry", "run", "uvicorn", "projeto_API_Backend:app", "--host", "0.0.0.0", "--port", "8000"] # inicia o serviço.
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+volumes:
+  db_data:
 
 
