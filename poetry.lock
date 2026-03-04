@@ -1006,6 +1006,26 @@ files = [
 ]
 
 [[package]]
+name = "redis"
+version = "7.2.1"
+description = "Python client for Redis database and key-value store"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "redis-7.2.1-py3-none-any.whl", hash = "sha256:49e231fbc8df2001436ae5252b3f0f3dc930430239bfeb6da4c7ee92b16e5d33"},
+    {file = "redis-7.2.1.tar.gz", hash = "sha256:6163c1a47ee2d9d01221d8456bc1c75ab953cbda18cfbc15e7140e9ba16ca3a5"},
+]
+
+[package.extras]
+circuit-breaker = ["pybreaker (>=1.4.0)"]
+hiredis = ["hiredis (>=3.2.0)"]
+jwt = ["pyjwt (>=2.9.0)"]
+ocsp = ["cryptography (>=36.0.1)", "pyopenssl (>=20.0.1)", "requests (>=2.31.0)"]
+otel = ["opentelemetry-api (>=1.39.1)", "opentelemetry-exporter-otlp-proto-http (>=1.39.1)", "opentelemetry-sdk (>=1.39.1)"]
+xxhash = ["xxhash (>=3.6.0,<3.7.0)"]
+
+[[package]]
 name = "rich"
 version = "14.2.0"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
@@ -1754,4 +1774,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "732f425241c50c5e92813f81588ff02e07d25987bbabf3d37d724785feac9617"
+content-hash = "d3a52d39ac144fe0572058f2b94e0fca298306618b39bec8db6ba267a90a6331"

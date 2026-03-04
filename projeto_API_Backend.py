@@ -10,6 +10,8 @@ from sqlalchemy import create_engine,Column ,Integer,String
 from sqlalchemy.orm import Session,sessionmaker,declarative_base
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+import redis
+import json
 
 # 1. Criacao de objetos/ Variaveis
 
@@ -42,7 +44,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL,connect_args={'check_same_thread': False})
 Sessionlocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
 Base = declarative_base()
-
+redis_client = redis.Redis(host='localhost',port=6379,db=0,decode_responses=True)
 # 2. Criacao de body model e das colunas do banco de dados
 
 class LivroDB(Base):
@@ -83,10 +85,28 @@ def autenticar_meu_usuario(crenditials: HTTPBasicCredentials = Depends(security)
             detail='Usuario ou senha incorretos',
             headers={'WWW-Authenticate':'Basic'}
         )
+    
+def salvar_livro_redis(livro_id: int, body: Livro):
+    redis_client.set(f'livro: {livro_id}',json.dumps(body.model_dump()))
+
+def delatar_livro_redis(livro_id: int):
+    redis_client.delete(f'livro:{livro_id}')
+
 
 # Criacao dos endpoints
 
 # 4. Metodo GET
+
+@app.get('/debug/redis')
+def ver_livros_redis():
+    chaves = redis_client.keys('livro:*')
+    livros = []
+
+    for chave in chaves:
+        valor = redis_client.get(chave)
+        livros.append({'chave':chave,'valor':json.loads(valor)})
+
+    return livros
 
 # 4.1 Criar um get para ver os livros que estao cadastrados
 @app.get('/livros')
@@ -156,6 +176,8 @@ async def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = De
     db.commit()
     db.refresh(novo_livro)
 
+    salvar_livro_redis(novo_livro.id, livro)
+
     return {'message':'O livro foi adicionado com sucesso'}
 
 
@@ -175,6 +197,9 @@ async def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),
     db_livro.nome_livro = livro.nome_livro
     db_livro.ano_lancamento = livro.ano_lancamento
     db_livro.nome_autor = livro.nome_autor
+
+    delatar_livro_redis(id_livro)
+    salvar_livro_redis(id_livro,livro)
 
     db.commit()
     db.refresh(db_livro)
@@ -197,4 +222,6 @@ async def delete_livros(id_livro:int, _: None = Depends(autenticar_meu_usuario),
     db.delete(db_livro)
     db.commit()
     
+    delatar_livro_redis(id_livro)
+
     return {'message':'Seu livro foi deletado com sucesso'}
