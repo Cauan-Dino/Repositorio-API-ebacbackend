@@ -77,10 +77,10 @@ jobs:
           asyncio.run(check())
           "
           
-                - name: Valida conexão com o redis
-                  run: |
-                    echo "Validando conexão com o redis"
-                    poetry run python -c "
+      - name: Valida conexão com o redis
+        run: |
+          echo "Validando conexão com o redis"
+          poetry run python -c "
           import redis
           import os
           import sys
