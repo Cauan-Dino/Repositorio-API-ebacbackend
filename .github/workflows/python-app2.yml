@@ -1,0 +1,112 @@
+name: FastAPI - Basic Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  fastapi-tests:
+    runs-on: ubuntu-latest
+  services:
+    redis:
+      image: redis:7-alpine
+      ports:
+        - 6379:6379
+      options: >-
+        --health-cmd "redis-cli ping"
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 5
+
+    kafka:
+      image: ubuntu/kafka:latest
+      ports:
+        - 9092:9092  
+      env:
+        KAFKA_NODE_ID: 1
+        KAFKA_PROCESS_ROLES: broker,controller
+        KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+        KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+        KAFKA_LISTENERS_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+        KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  env:
+    DATABASE_URL: ${{ vars.DATABASE_URL }}
+    KAFKA_SERVER: ${{ vars.KAFKA_SERVER }}
+    MEU_USUARIO: ${{ vars.MEU_USUARIO }}
+    MINHA_SENHA: ${{ vars.MINHA_SENHA }}
+    PYTHONUNBUFFERED: ${{ vars.PYTHONUNBUFFERED }}
+    REDIS_HOST: ${{ vars.REDIS_HOST }}
+    REDIS_PORT: ${{ vars.REDIS_PORT }}
+    REDIS_URL: ${{ vars.REDIS_URL }}
+
+  steps:
+  - name: 💾 Checkout do código
+    uses: actions/checkout@v3
+  
+  - name: 🐍 Instalar Python
+    uses: actions/setup-python@v4
+    with:
+      python-version: '3.13'
+    
+  - name: 🦅 Instalar Poetry
+    run: |
+      curl -sSL https://install.python-poetry.org | python3 -
+      echo "$HOME/.local/bin" >> $GITHUB_PATH
+    
+  - name: 📦 Instalar dependências com Poetry
+    run: poetry install --no-interaction --no-root
+    
+  - name: 🗄️ Instalar e Validar o banco de dados
+    run: |
+      echo "Validando conexão com o banco SQLite..."
+      poetry run python -c "
+      import asyncio
+      import os
+      from sqlalchemy.ext.asyncio import create_async_engine
+      DATABASE_URL = os.getenv('DATABASE_URL')
+      async def check():
+          engine = create_async_engine(DATABASE_URL)
+          async with engine.connect() as conn:
+              await conn.exec_compile_json_format_or_none() if hasattr(conn, 'exec_compile_json_format_or_none') else await conn.execute('SELECT 1')
+          print('✅ Banco de dados respondendo perfeitamente!')
+      asyncio.run(check())
+      "
+
+  - name: Valida conexão com o redis
+    run: |
+      echo "Validando conexão com o redis"
+      poetry run python -c "
+      import redis
+      import os
+      try:
+        REDIS_HOST = os.getenv('REDIS_HOST')
+        REDIS_PORT = os.getenv('REDIS_PORT')
+        redis_client = redis.Redis(host=REDIS_HOST,db=0,decode_responses=True,port=REDIS_PORT)
+        if redis_client.ping():
+          print('✅ Conexão com Redis estabelecida com sucesso!')
+      except Exception as e:
+        print(f'❌ Erro ao conectar com o Redis: {e}')
+      "
+
+  - name: Valida conexão com o kafka
+    run: |
+      echo "Validando conexão com o Kafka"
+      poetry run python -c "
+      from confluent_kafka.admin import AdminClient
+      conf = {'bootstrap.servers': localhost:9092}
+  
+      client = AdminClient(conf)
+      
+      try:
+          metadata = client.list_topics(timeout=3.0)
+          print(f"✅ Kafka está ONLINE! ID do Broker: {metadata.cluster_id}")
+          
+      except Exception as e:
+          print(f"❌ Kafka está OFFLINE ou inacessível. Erro: {e}")
+      "
+      
+  - name: 🧪 Rodar testes (placeholder)
+    run: echo "Nenhum teste configurado ainda."name: FastAPI - Basic Check
