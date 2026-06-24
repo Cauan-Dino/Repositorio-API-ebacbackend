@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livros-api
+  labels:
+    app: livros-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: livros-api
+  template:
+    metadata:
+      labels:
+        app: livros-api
+    spec:
+      containers:
+        - name: livros-api
+          image: livros-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: livros-api-env

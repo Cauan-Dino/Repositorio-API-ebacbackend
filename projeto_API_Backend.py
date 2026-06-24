@@ -1,6 +1,9 @@
 from dotenv import load_dotenv
 load_dotenv(dotenv_path="variaveis_ambientes.env")
-from fastapi import FastAPI,HTTPException,Depends
+from fastapi import FastAPI,HTTPException,Depends,BackgroundTasks
+from tasks import fatorial,somar
+from celery_app import celery_app
+from celery.result import AsyncResult
 from fastapi.security import HTTPBasicCredentials,HTTPBasic
 from pydantic import BaseModel
 from typing import Optional
@@ -12,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import redis
 import json
+from kafka_producer import enviar_evento
 
 # 1. Criacao de objetos/ Variaveis
 
@@ -41,10 +45,14 @@ security = HTTPBasic()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
+REDIS_HOST = os.getenv("REDIS_HOST","locahost")
+REDIS_PORT = os.getenv("REDIS_PORT","6379")
+
 engine = create_engine(DATABASE_URL,connect_args={'check_same_thread': False})
 Sessionlocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
 Base = declarative_base()
-redis_client = redis.Redis(host='localhost',port=6379,db=0,decode_responses=True)
+redis_client = redis.Redis(host=REDIS_HOST,port=REDIS_PORT,db=0,decode_responses=True)
 # 2. Criacao de body model e das colunas do banco de dados
 
 class LivroDB(Base):
@@ -85,9 +93,9 @@ def autenticar_meu_usuario(crenditials: HTTPBasicCredentials = Depends(security)
             detail='Usuario ou senha incorretos',
             headers={'WWW-Authenticate':'Basic'}
         )
-    
+
 def salvar_livro_redis(livro_id: int, body: Livro):
-    redis_client.set(f'livro: {livro_id}',json.dumps(body.model_dump()))
+    redis_client.set(f'livro:{livro_id}',json.dumps(body.model_dump()))
 
 def delatar_livro_redis(livro_id: int):
     redis_client.delete(f'livro:{livro_id}')
@@ -98,13 +106,15 @@ def delatar_livro_redis(livro_id: int):
 # 4. Metodo GET
 
 @app.get('/debug/redis')
-def ver_livros_redis():
-    chaves = redis_client.keys('livro:*')
+async def ver_livros_redis():
+    chaves = redis_client.keys('livros:*')
     livros = []
 
     for chave in chaves:
         valor = redis_client.get(chave)
-        livros.append({'chave':chave,'valor':json.loads(valor)})
+        ttl = redis_client.ttl(chave)
+
+        livros.append({'chave':chave,'valor':json.loads(valor),'ttl': ttl})
 
     return livros
 
@@ -112,27 +122,66 @@ def ver_livros_redis():
 @app.get('/livros')
 async def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: None = Depends(autenticar_meu_usuario)):
     if page < 1 or limit < 1:
-        raise HTTPException(status_code=400,detail='Page ou limit invalidos')
+        raise HTTPException(
+            status_code=400,
+            detail='Page ou limit estao com valores invalidos'
+        )
+    
+    cache_key = f'livros:page={page}&limit={limit}'
+    cached = redis_client.get(cache_key)
+    
+    if cached:
+        return json.loads(cached)
     
     livros = db.query(LivroDB).offset((page-1)*limit).limit(limit).all()
-    
+
     if not livros:
-        return {'message':'Ainda nao ha nada castrado'}
+        raise HTTPException(
+            status_code=400,
+            detail='Nao existe nenhum livro'
+        )
     
     total_livros = db.query(LivroDB).count()
 
+    resposta = {
+        'page': page,
+        'limit': limit,
+        'quantidade': total_livros,
+        'livros': [{
+            'livro_id': valor.id,
+            'nome_livro': valor.nome_livro,
+            'nome_autor': valor.nome_autor,
+            'ano_lancamento': valor.ano_lancamento
+        }
+        for valor in livros
+        ]
+    }
+
+    redis_client.setex(cache_key,30,json.dumps(resposta))
+
+    return resposta
+
+
+
+@app.get('/tarefas/recentes')
+def listar_tarefas_recentes():
+    ids = redis_client.lrange('tarefas_ids',0,-1)
+    tarefas = []
+
+    for task_id in ids:
+        resultado = AsyncResult(task_id,app=celery_app)
+        tarefas.append({
+            'task_id': task_id,
+            'status': resultado.status,
+            'resultado': resultado.result if resultado.successful() else None
+        })
+
     return {
-        'pagina': page,
-        'limite': limit,
-        'total': total_livros,
-        'livros': [
-            {'id':livro.id,'nome_livro':livro.nome_livro,'nome_autor':livro.nome_autor,'ano_lancamento':livro.ano_lancamento}
-            for livro in livros
-                    ]
-            }
+        'tarefas': tarefas
+    }
 
 @app.get('/')
-def hello_world():
+def hello_world(_:None = Depends(autenticar_meu_usuario)):
     return {'hello':'world'}
 
 async def resultado_1():
@@ -163,24 +212,63 @@ async def mostrar_resultados():
 
 # 5.1 Criar um post para adicionar um livro
 @app.post('/livros')
-async def post_livros(livro: Livro,db: Session = Depends(sessao_db),_: None = Depends(autenticar_meu_usuario)):
-    db_livro = db.query(LivroDB).filter(LivroDB.nome_livro == livro.nome_livro,LivroDB.nome_autor == livro.nome_autor).first()
+async def post_livros(
+    livro: Livro,
+    db: Session = Depends(sessao_db),
+    _: None = Depends(autenticar_meu_usuario)
+    ):
+    db_livro = db.query(LivroDB).filter(
+        LivroDB.nome_livro == livro.nome_livro,
+        LivroDB.nome_autor == livro.nome_autor
+    ).first()
+
     if db_livro:
         raise HTTPException(
             status_code=400,
             detail='Esse livro ja existe'
         )
-    
-    novo_livro = LivroDB(nome_livro = livro.nome_livro, nome_autor = livro.nome_autor,ano_lancamento = livro.ano_lancamento)
+
+    novo_livro = LivroDB(
+        nome_livro=livro.nome_livro,
+        nome_autor=livro.nome_autor,
+        ano_lancamento=livro.ano_lancamento
+    )
+
     db.add(novo_livro)
     db.commit()
     db.refresh(novo_livro)
 
     salvar_livro_redis(novo_livro.id, livro)
 
+    enviar_evento(
+        'livros_evento',
+        {
+            'acao': 'criar',
+            'livro': livro.model_dump()
+        }
+    )
+
     return {'message':'O livro foi adicionado com sucesso'}
 
+@app.post('/calcular/soma')
+def calcular_soma(a: int, b: int):
+    tarefa = somar.delay(a, b)
+    redis_client.lpush("tarefas_ids",tarefa.id)
+    redis_client.ltrim("tarefas_ids",0,49)
+    return {
+        'task_id': tarefa.id,
+        'message': 'tarefa de soma enviada para execucao'
+    }
 
+@app.post('/calcular/fatorial')
+def calcular_fatorial(n: int):
+    tarefa = fatorial.delay(n)
+    redis_client.lpush("tarefas_ids",tarefa.id)
+    redis_client.ltrim("tarefas_ids",0,49)
+    return {
+        'task_id': tarefa.id,
+        'message': 'tarefa de fatorial enviada para execucao'
+    }
 
 # 6. Metodo PUT
 
@@ -198,7 +286,9 @@ async def put_livros(id_livro:int,livro: Livro,db: Session = Depends(sessao_db),
     db_livro.ano_lancamento = livro.ano_lancamento
     db_livro.nome_autor = livro.nome_autor
 
+    # Deleta a informacao no cache
     delatar_livro_redis(id_livro)
+    # Muda as informacoes existentes do livro
     salvar_livro_redis(id_livro,livro)
 
     db.commit()
@@ -221,7 +311,11 @@ async def delete_livros(id_livro:int, _: None = Depends(autenticar_meu_usuario),
         )
     db.delete(db_livro)
     db.commit()
-    
-    delatar_livro_redis(id_livro)
 
     return {'message':'Seu livro foi deletado com sucesso'}
+
+@app.delete('/deletar/cache')
+async def limpar_cache_lista():
+    chaves = redis_client.keys('livros:*')
+    for chave in chaves:
+        redis_client.delete(chave)

@@ -7,7 +7,9 @@ RUN pip install poetry
 
 COPY pyproject.toml poetry.lock ./
 
-RUN poetry config virtualenvs.create false && poetry install --no-root
+RUN poetry config virtualenvs.create false \
+    && poetry lock \
+    && poetry install --no-root
 
 # COPY . . Ela copia arquivos do seu projeto para dentro da imagem Docker.
     # primeiro . → a pasta atual do seu projeto (no seu PC)
