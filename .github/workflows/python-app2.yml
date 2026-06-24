@@ -98,13 +98,14 @@ jobs:
       - name: Valida conexão com o kafka
         run: |
           echo "Validando conexão com o Kafka"
+          sleep 30
           poetry run python -c "
           import sys
           from confluent_kafka.admin import AdminClient
           conf = {'bootstrap.servers': 'localhost:9092'}
           client = AdminClient(conf)
           try:
-              metadata = client.list_topics(timeout=5.0)
+              metadata = client.list_topics(timeout=10.0)
               print('✅ Kafka está ONLINE!')
           except Exception as e:
               print(f'❌ Kafka está OFFLINE. Erro: {e}')
