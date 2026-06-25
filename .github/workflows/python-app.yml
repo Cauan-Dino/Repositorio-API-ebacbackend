@@ -86,7 +86,7 @@ jobs:
       - name: Validar conexão com o Redis
         run: |
           echo "Validando conexão com o Redis"
-          run poetry python -c "
+          poetry run python -c "
           import redis
           import os
           import sys
@@ -98,6 +98,7 @@ jobs:
               print('✅ Conexão com Redis estabelecida com sucesso!')
           except Exception as e:
             print(f'❌ Erro ao conectar com o Redis: {e}')
+            sys.exit(1)
           "
       - name: Validar conexão com o Kafka
         run: |
