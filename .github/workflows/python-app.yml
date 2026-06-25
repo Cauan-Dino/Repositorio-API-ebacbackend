@@ -116,6 +116,7 @@ jobs:
           except Exception as e:
             print(f'❌ Kafka está OFFLINE. Erro: {e}')
             sys.exit(1)
+          "
       - name: 🧪 Rodar testes
         run: echo "Nenhum teste configurado ainda."
       
