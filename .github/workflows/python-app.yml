@@ -119,5 +119,5 @@ jobs:
             sys.exit(1)
           "
       - name: 🧪 Rodar testes
-        run: echo "Nenhum teste configurado ainda."
+        run: poetry run pytest
       
