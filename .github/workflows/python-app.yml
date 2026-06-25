@@ -9,23 +9,112 @@ on:
 jobs:
   fastapi-tests:
     runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      zookeeper:
+        image: confluentinc/cp-zookeeper:7.5.0
+        ports: 
+          - 2181:2181
+        env: 
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+      kafka:
+        image: confluentinc/cp-kafka:7.5.0
+        ports:
+          - "9092:9092"
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+    env:
+      DATABASE_URL: ${{ vars.DATABASE_URL }}
+      KAFKA_SERVER: ${{ vars.KAFKA_SERVER }}
+      MEU_USUARIO: ${{ vars.MEU_USUARIO }}
+      MINHA_SENHA: ${{ vars.MINHA_SENHA }}
+      PYTHONUNBUFFERED: ${{ vars.PYTHONUNBUFFERED }}
+      REDIS_HOST: ${{ vars.REDIS_HOST }}
+      REDIS_PORT: ${{ vars.REDIS_PORT }}
+      REDIS_URL: ${{ vars.REDIS_URL }}
 
     steps:
       - name: 💾 Checkout do código
         uses: actions/checkout@v3
 
-      - name: 🐍 Instalar Python
+      - name: 🐍 Instalar python
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
-
-      - name: 🦅 Instalar Poetry
+      
+      - name: 🦅 Instalar poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: 📦 Instalar dependências com Poetry
+      
+      - name: 📦 Instalar depedências com o Poetry
         run: poetry install --no-interaction --no-root
+      
+      - name: Verificar conexão com o Banco De Dados
+        run: |
+          echo "Validando conexão com o Banco de Dados"
+          poetry run python -c "
+          import asyncio
+          from sqlalchemy.ext.asyncio import create_async_engine
+          import os
 
-      - name: 🧪 Rodar testes (placeholder)
+          DATABASE_URL = os.getenv('DATABASE_URL')
+          async def check():
+            engine = create_async_engine(DATABASE_URL)
+            async with engine.connect() as conn:
+              await conn.execute(__import__('sqlalchemy').text('SELECT 1'))
+            print('✅ Banco de dados respondendo perfeitamente!')
+          asyncio.run(check())
+          "
+      - name: Validar conexão com o Redis
+        run: |
+          echo "Validando conexão com o Redis"
+          run poetry python -c "
+          import redis
+          import os
+          import sys
+          try:
+            REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+            REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+            redis_client = redis.Redis(host=REDIS_HOST, db=0, decode_responses=True, port=REDIS_PORT, socket_connect_timeout=3)
+            if redis_client.ping():
+              print('✅ Conexão com Redis estabelecida com sucesso!')
+          except Exception as e:
+            print(f'❌ Erro ao conectar com o Redis: {e}')
+          "
+      - name: Validar conexão com o Kafka
+        run: |
+          echo "Aguardando Kafka iniciar..."
+          sleep 30
+          echo "Validando conexão com o Kafka"
+          poetry run python -c "
+          import sys
+          from confluent_kafka.admin import AdminClient
+          conf = {'bootstrap.servers': 'localhost:9092'}
+          client = AdminClient(conf)
+          try:
+            metadata = client.list_topics(timeout=10.0)
+            print('✅ Kafka está ONLINE!')
+          except Exception as e:
+            print(f'❌ Kafka está OFFLINE. Erro: {e}')
+            sys.exit(1)
+      - name: 🧪 Rodar testes
         run: echo "Nenhum teste configurado ainda."
+      
