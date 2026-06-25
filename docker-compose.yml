@@ -90,7 +90,7 @@ services:
     volumes:
       - .:/app
     
-    command: poetry run celery -A celery_app.celery_app worker --loglevel=info
+    command: celery -A celery_app worker --loglevel=info
   kafka-ui:
     container_name: livros-kafka-ui
     image: provectuslabs/kafka-ui:latest

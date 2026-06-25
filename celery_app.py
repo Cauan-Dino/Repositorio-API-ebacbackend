@@ -2,6 +2,7 @@ from celery import Celery
 import os
 from dotenv import load_dotenv
 
+
 load_dotenv(dotenv_path="variaveis_ambientes.env")
 
 REDIS_HOST = os.getenv("REDIS_HOST","REDIS")
