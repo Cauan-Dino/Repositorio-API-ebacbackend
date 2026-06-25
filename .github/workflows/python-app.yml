@@ -68,7 +68,7 @@ jobs:
       - name: 📦 Instalar depedências com o Poetry
         run: poetry install --no-interaction --no-root
       
-      - name: Verificar conexão com o Banco De Dados
+      - name: 🗄️ Verificar conexão com o Banco De Dados
         run: |
           echo "Validando conexão com o Banco de Dados"
           poetry run python -c "
@@ -84,7 +84,7 @@ jobs:
             print('✅ Banco de dados respondendo perfeitamente!')
           asyncio.run(check())
           "
-      - name: Validar conexão com o Redis
+      - name: ⚡ Validar conexão com o Redis
         run: |
           echo "Validando conexão com o Redis"
           poetry run python -c "
@@ -101,7 +101,7 @@ jobs:
             print(f'❌ Erro ao conectar com o Redis: {e}')
             sys.exit(1)
           "
-      - name: Validar conexão com o Kafka
+      - name: 🌊 Validar conexão com o Kafka
         run: |
           echo "Aguardando Kafka iniciar..."
           sleep 30
