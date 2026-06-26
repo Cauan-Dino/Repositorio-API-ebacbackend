@@ -2,9 +2,9 @@ name: FastAPI - Basic Check
 
 on:
   push:
-    branches: [main]
+    branches: [teste-1.0]
   pull_request:
-    branches: [main]
+    branches: [teste-1.0]
 
 jobs:
   fastapi-docker-test:
