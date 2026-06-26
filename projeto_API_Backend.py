@@ -43,11 +43,11 @@ security = HTTPBasic()
 
 # 1.3 Criacao da variavel para criar um banco de dados
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-REDIS_HOST = os.getenv("REDIS_HOST","locahost")
-REDIS_PORT = os.getenv("REDIS_PORT","6379")
+# REDIS_HOST = os.getenv("REDIS_HOST","locahost")
+# REDIS_PORT = os.getenv("REDIS_PORT","6379")
 
 engine = create_engine(DATABASE_URL,connect_args={'check_same_thread': False})
 Sessionlocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
