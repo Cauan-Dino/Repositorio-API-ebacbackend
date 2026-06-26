@@ -20,15 +20,15 @@ from kafka_producer import enviar_evento
 # 1. Criacao de objetos/ Variaveis
 
 # 1.1 Criacao do objeto da classe FastAPI que permite a gente a conseguir utilizar os endpoints
- app = FastAPI(
-     title= 'API De livros',
-     description= 'API de catálogos de livros do curso da ebac Back-end',
-     version='1.0.0',
-     contact={
-         'email':'cauanppenha@gmail.com',
-         'name': 'cauan dino penha'
-         }
- )
+app = FastAPI(
+    title= 'API De livros',
+    description= 'API de catálogos de livros do curso da ebac Back-end',
+    version='1.0.0',
+    contact={
+        'email':'cauanppenha@gmail.com',
+        'name': 'cauan dino penha'
+        }
+)
 
 app.add_middleware(
     CORSMiddleware,
