@@ -35,9 +35,6 @@ jobs:
       - name: Build imagem
         run: docker build -t fastapi-app:latest .
 
-      - name: Run Dockerfile
-        run: docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
-
       - name: Simular inicialização do container (Smoke Test)
         run: |
           # 1. Remove o contêiner antigo se ele existir (o '|| true' impede a pipeline de quebrar se não existir)
