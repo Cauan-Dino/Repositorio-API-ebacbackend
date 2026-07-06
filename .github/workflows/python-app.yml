@@ -38,7 +38,7 @@ jobs:
       - name: Inicializar docker
         run: |
           docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
-          sleep(5)
+          sleep 5
           docker ps | grep container | grep Up
       
       - name: Verificar se o container subiu
