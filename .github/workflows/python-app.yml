@@ -39,7 +39,7 @@ jobs:
         run: |
           docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
           sleep 5
-          docker ps | grep container | grep Up
+          docker ps | grep container-teste | grep Up
       
       - name: Verificar se o container subiu
         run: |
