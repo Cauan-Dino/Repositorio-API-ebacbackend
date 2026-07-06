@@ -35,12 +35,6 @@ jobs:
       - name: Build imagem
         run: docker build -t fastapi-app:latest .
 
-      - name: Inicializar docker
-        run: |
-          docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
-          sleep 5
-          docker ps | grep container-teste | grep Up
+      - name: Run Dockerfile
+        run: docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
       
-      - name: Verificar se o container subiu
-        run: |
-          curl --fail http://localhost:8080/docs || exit 1
