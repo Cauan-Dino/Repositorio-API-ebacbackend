@@ -37,4 +37,15 @@ jobs:
 
       - name: Run Dockerfile
         run: docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
+
+      - name: Simular inicialização do container (Smoke Test)
+        run: |
+          # 1. Roda o container em background mapeando a porta
+          docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
+          
+          # 2. Aguarda 5 segundos para dar tempo do FastAPI inicializar por completo
+          sleep 5
+          
+          # 3. Verifica o status do container. Se ele tiver morrido, o comando 'grep Up' falha e quebra a pipeline.
+          docker ps | grep container-teste | grep Up 
       
