@@ -1,5 +1,4 @@
 name: FastAPI - Basic Check
-
 on:
   push:
     branches: [main]
@@ -7,8 +6,9 @@ on:
     branches: [main]
 
 jobs:
-  fastapi-tests:
+  test:
     runs-on: ubuntu-latest
+
     services:
       redis:
         image: redis:7-alpine
@@ -19,13 +19,15 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       zookeeper:
-        image: confluentinc/cp-zookeeper:7.5.0 
+        image: confluentinc/cp-zookeeper:7.5.0
         ports:
           - 2181:2181
         env:
           ZOOKEEPER_CLIENT_PORT: 2181
           ZOOKEEPER_TICK_TIME: 2000
+
       kafka:
         image: confluentinc/cp-kafka:7.5.0
         ports:
@@ -38,63 +40,118 @@ jobs:
           KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
           KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
           KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
     env:
-      DATABASE_URL: ${{ vars.DATABASE_URL }}
-      KAFKA_SERVER: ${{ vars.KAFKA_SERVER }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      KAFKA_SERVER: localhost:9092
       MEU_USUARIO: ${{ vars.MEU_USUARIO }}
-      MINHA_SENHA: ${{ vars.MINHA_SENHA }}
-      PYTHONUNBUFFERED: ${{ vars.PYTHONUNBUFFERED }}
-      REDIS_HOST: ${{ vars.REDIS_HOST }}
-      REDIS_PORT: ${{ vars.REDIS_PORT }}
-      REDIS_URL: ${{ vars.REDIS_URL }}
-  test:
-    runs-on: ubuntu-latest
-    
+      MINHA_SENHA: ${{ secrets.MINHA_SENHA }}
+      PYTHONUNBUFFERED: "1"
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_URL: redis://localhost:6379/0
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+
+      - name: Cache Poetry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.local/bin
+          key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Instalar Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Instalar depedencias
+      - name: Instalar dependencias
         run: poetry install --no-interaction --no-root
+
+      - name: Aguardar Kafka ficar pronto
+        run: |
+          for i in $(seq 1 15); do
+            nc -z localhost 9092 && echo "Kafka disponível" && break
+            echo "Aguardando Kafka... ($i)"
+            sleep 2
+          done
 
       - name: Rodar Testes
         run: poetry run pytest -v
 
   docker-build:
     runs-on: ubuntu-latest
+    needs: test
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      zookeeper:
+        image: confluentinc/cp-zookeeper:7.5.0
+        ports:
+          - 2181:2181
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+
+      kafka:
+        image: confluentinc/cp-kafka:7.5.0
+        ports:
+          - 9092:9092
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Build imagem
         run: docker build -t fastapi-app:latest .
 
-      - name: Simular inicialização do container (Smoke Test)
+      - name: Subir container de teste (Smoke Test)
         run: |
-          # 1. Remove o contêiner antigo se ele existir (o '|| true' impede a pipeline de quebrar se não existir)
           docker rm -f container-teste || true
-          
-          # 2. Agora o caminho está livre para rodar o novo contêiner com segurança
-          docker run -d -p 8080:8080 --name container-teste fastapi-app:latest
-          
-          # 3. Aguarda a inicialização
+
+          # --network host permite o container enxergar os services
+          # (redis/kafka/zookeeper) expostos em localhost do runner
+          docker run -d --network host --name container-teste \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e KAFKA_SERVER="localhost:9092" \
+            -e REDIS_HOST="localhost" \
+            -e REDIS_PORT="6379" \
+            -e REDIS_URL="redis://localhost:6379/0" \
+            fastapi-app:latest
+
           sleep 5
-          
-          # 4. Valida se continua de pé
+
           docker ps | grep container-teste | grep Up
-      
+
       - name: Validar se a API responde (Healthcheck)
-        run: |
-          # 4. Faz uma requisição HTTP na rota principal ou de docs para ver se a API responde com sucesso (Status 200)
-          curl --fail http://localhost:8080/docs || exit 1
+        run: curl --fail http://localhost:8080/docs || exit 1
+
+      - name: Mostrar logs se falhar
+        if: failure()
+        run: docker logs container-teste
 
       - name: Limpar o container de teste
-        if: always() # Garante que o container será parado mesmo se os passos anteriores falharem
+        if: always()
         run: docker rm -f container-teste
-      
