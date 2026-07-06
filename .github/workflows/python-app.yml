@@ -49,3 +49,12 @@ jobs:
           # 3. Verifica o status do container. Se ele tiver morrido, o comando 'grep Up' falha e quebra a pipeline.
           docker ps | grep container-teste | grep Up 
       
+      - name: Validar se a API responde (Healthcheck)
+        run: |
+          # 4. Faz uma requisição HTTP na rota principal ou de docs para ver se a API responde com sucesso (Status 200)
+          curl --fail http://localhost:8080/docs || exit 1
+
+      - name: Limpar o container de teste
+        if: always() # Garante que o container será parado mesmo se os passos anteriores falharem
+        run: docker rm -f container-teste
+      
