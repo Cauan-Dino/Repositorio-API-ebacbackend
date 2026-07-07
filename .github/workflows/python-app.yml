@@ -79,13 +79,13 @@ jobs:
           docker rm -f container-teste || true
 
           docker run -d --network host --name container-teste \
-            -e DATABASE_URL="${{ vars.DATABASE_URL }}" \
-            -e KAFKA_SERVER="${{ vars.KAFKA_SERVER }}" \
-            -e REDIS_HOST="${{ vars.REDIS_HOST }}" \
-            -e REDIS_PORT="${{ vars.REDIS_PORT }}" \
-            -e REDIS_URL="${{ vars.REDIS_URL }}" \
-          fastapi-app:latest
-
+            -e DATABASE_URL="sqlite:///./app.db" \
+            -e KAFKA_SERVER="localhost:9092" \
+            -e REDIS_HOST="localhost" \
+            -e REDIS_PORT="6379" \
+            -e REDIS_URL="redis://localhost:6379/0" \
+            fastapi-app:latest
+          
           sleep 5
 
           docker logs container-teste
