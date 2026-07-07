@@ -98,7 +98,7 @@ jobs:
         run: docker ps | grep container-teste | grep Up
 
       - name: Validar se a API responde (Healthcheck)
-        run: curl --fail http://localhost:8080/docs || exit 1
+        run: curl --fail http://localhost:8000/docs || exit 1
 
       - name: Mostrar logs se falhar
         if: failure()
