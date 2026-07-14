@@ -1,0 +1,11 @@
+2026-07-12 09:52:12,102 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:03:24,451 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:27:04,069 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:30:38,361 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:30:59,433 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:31:08,083 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:31:16,751 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:45:04,383 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 10:46:04,300 - INFO - [_transport.py:382] - POST http://elasticsearch:9200/livros-logs/_doc [status:400 duration:0.004s]
+2026-07-12 10:46:06,048 - INFO - [projeto_API_Backend.py:33] - API inicializada com sucesso
+2026-07-12 11:24:37,639 - INFO - [_transport.py:382] - POST http://elasticsearch:9200/livros-logs/_doc [status:400 duration:0.006s]

@@ -52,7 +52,7 @@ def test_listar_livros(autenticacao_do_usuario_redis_e_banco_de_dados,mocker: Mo
 
 def test_adicionar_livro(autenticacao_do_usuario_redis_e_banco_de_dados,mocker: MockerFixture):
     mock_db = autenticacao_do_usuario_redis_e_banco_de_dados
-
+    
     mock_db.query.return_value.filter.return_value.first = lambda: None
 
     payload = {

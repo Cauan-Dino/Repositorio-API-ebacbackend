@@ -3,23 +3,24 @@ version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
-    
+
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    
+
     ports:
       - "2181:2181"
-    
+
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2181"]
       interval: 10s
       timeout: 5s
       retries: 5
+
   kafka:
     container_name: livros-kafka
     image: confluentinc/cp-kafka:latest
-    
+
     depends_on:
       zookeeper:
         condition: service_healthy
@@ -33,7 +34,7 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    
+
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -47,62 +48,114 @@ services:
   redis:
     container_name: ebac_redis
     image: redis:7.2-alpine
-    
+
     ports:
       - "6379:6379"
-    
+
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
   app:
     container_name: ebac_app
     build: .
 
     ports:
       - "8000:8000"
-    
+
     depends_on:
       kafka:
         condition: service_healthy
       redis:
         condition: service_healthy
-        
+
     env_file:
-      - variaveis_ambientes.env
-    
+      - .env
+
     volumes:
       - .:/app
-    
+      - ./logs:/logs
+
     command: uvicorn projeto_API_Backend:app --host 0.0.0.0 --port 8000 --reload
+
   celery:
     build: .
     container_name: ebac_celery
-    
+
     depends_on:
       redis:
         condition: service_healthy
 
     env_file:
-      - variaveis_ambientes.env
-    
+      - .env
+
     volumes:
       - .:/app
-    
+
     command: celery -A celery_app worker --loglevel=info
+
   kafka-ui:
     container_name: livros-kafka-ui
     image: provectuslabs/kafka-ui:latest
-    
+
     ports:
       - "8080:8080"
-    
+
     depends_on:
       kafka:
         condition: service_healthy
-    
+
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+    ports:
+      - "9200:9200"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash
+
+    depends_on:
+      - elasticsearch
+
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./logs:/logs
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+
+    ports:
+      - "5601:5601"
+
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+
+    depends_on:
+      - elasticsearch
+
+volumes:
+  esdata:

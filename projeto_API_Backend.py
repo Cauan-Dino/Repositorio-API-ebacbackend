@@ -17,6 +17,21 @@ import redis
 import json
 from kafka_producer import enviar_evento
 
+# Configuração LOGS
+import logging.config
+import yaml
+from elasticsearch import Elasticsearch
+from datetime import datetime
+
+es_client = Elasticsearch(hosts=['http://elasticsearch:9200'])
+
+with open('logging.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+    logging.config.dictConfig(config)
+
+logger = logging.getLogger(__name__)
+logger.info("API inicializada com sucesso")
+
 # 1. Criacao de objetos/ Variaveis
 
 # 1.1 Criacao do objeto da classe FastAPI que permite a gente a conseguir utilizar os endpoints
@@ -43,11 +58,11 @@ security = HTTPBasic()
 
 # 1.3 Criacao da variavel para criar um banco de dados
 
-# DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-# REDIS_HOST = os.getenv("REDIS_HOST","locahost")
-# REDIS_PORT = os.getenv("REDIS_PORT","6379")
+REDIS_HOST = os.getenv("REDIS_HOST","locahost")
+REDIS_PORT = os.getenv("REDIS_PORT","6379")
 
 engine = create_engine(DATABASE_URL,connect_args={'check_same_thread': False})
 Sessionlocal = sessionmaker(autocommit=False,autoflush=False,bind=engine)
@@ -120,7 +135,7 @@ async def ver_livros_redis():
 
 # 4.1 Criar um get para ver os livros que estao cadastrados
 @app.get('/livros')
-async def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,_: None = Depends(autenticar_meu_usuario)):
+async def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =10,credenciais: None = Depends(autenticar_meu_usuario)):
     if page < 1 or limit < 1:
         raise HTTPException(
             status_code=400,
@@ -140,25 +155,40 @@ async def get_livros(db: Session = Depends(sessao_db),page: int = 1,limit: int =
             status_code=400,
             detail='Nao existe nenhum livro'
         )
-    
-    total_livros = db.query(LivroDB).count()
+    else:
+        total_livros = db.query(LivroDB).count()
 
-    resposta = {
-        'page': page,
-        'limit': limit,
-        'quantidade': total_livros,
-        'livros': [{
-            'livro_id': valor.id,
-            'nome_livro': valor.nome_livro,
-            'nome_autor': valor.nome_autor,
-            'ano_lancamento': valor.ano_lancamento
+        resposta = {
+            'page': page,
+            'limit': limit,
+            'quantidade': total_livros,
+            'livros': [{
+                'livro_id': valor.id,
+                'nome_livro': valor.nome_livro,
+                'nome_autor': valor.nome_autor,
+                'ano_lancamento': valor.ano_lancamento
+            }
+            for valor in livros
+            ]
         }
-        for valor in livros
-        ]
-    }
-
     redis_client.setex(cache_key,30,json.dumps(resposta))
 
+    
+    log = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'endpoint': '/livros',
+        'usuario': credenciais.username,
+        'page': page,
+        'limit': limit,
+        'status': 'success' if livros else 'not_found',
+        'total_livros': len(livros)
+    }
+
+    try:
+        es_client.index(index='livros-logs',body=log)
+    except Exception as e:
+        print(f'Erro ao enviar log para o Elasticsearch: {e}')
+    
     return resposta
 
 
@@ -182,6 +212,7 @@ def listar_tarefas_recentes():
 
 @app.get('/')
 def hello_world(_:None = Depends(autenticar_meu_usuario)):
+    logger.info("Alguém acessou a raiz da API")
     return {'hello':'world'}
 
 async def resultado_1():
